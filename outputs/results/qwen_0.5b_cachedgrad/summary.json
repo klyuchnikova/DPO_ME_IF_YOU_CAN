@@ -1,0 +1,33 @@
+{
+  "metadata": {
+    "exp_name": "qwen_0.5b_cachedgrad",
+    "model_name": "Qwen/Qwen2.5-0.5B-Instruct",
+    "checkpoint": "outputs/checkpoints/qwen_0.5b_cachedgrad/final",
+    "weight_method": "cached_grad",
+    "evaluation_method": "uniform",
+    "cached_weights_path": "cache/qwen_0.5b/test_cachedgrad_weights.pt",
+    "split": "test",
+    "split_path": "data/processed/test.jsonl",
+    "num_split_examples": 500,
+    "max_length": 512,
+    "max_prompt_length": 256,
+    "beta": 0.1,
+    "precision": "auto",
+    "device": "cuda",
+    "timestamp_unix": 1782309382.954717
+  },
+  "preference": null,
+  "runtime": {
+    "mean_step_sec": 0.9274146458992618,
+    "num_steps": 20,
+    "weight_method": "cached_grad",
+    "model_name": "Qwen/Qwen2.5-0.5B-Instruct",
+    "num_runtime_steps": 20,
+    "cached_weights_path": "cache/qwen_0.5b/train_cachedgrad_weights.pt"
+  },
+  "visualization": {
+    "num_visualized": 5,
+    "figure_dir": "outputs/results/qwen_0.5b_cachedgrad/figures",
+    "table_csv": "outputs/results/qwen_0.5b_cachedgrad/tables/weight_examples.csv"
+  }
+}

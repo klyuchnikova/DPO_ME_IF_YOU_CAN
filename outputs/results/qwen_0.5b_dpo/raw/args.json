@@ -1,0 +1,19 @@
+{
+  "config": "configs/qwen_0.5b_dpo.yaml",
+  "device": null,
+  "train_path": null,
+  "val_path": null,
+  "test_path": null,
+  "checkpoint": "outputs/checkpoints/qwen_0.5b_dpo/final",
+  "split": "test",
+  "exp_name": "qwen_0.5b_dpo",
+  "results_root": "outputs/results",
+  "num_runtime_steps": 20,
+  "skip_runtime": false,
+  "skip_preference": false,
+  "skip_visualize": false,
+  "num_visualize": 5,
+  "cached_weights": null,
+  "max_plot_tokens": 160,
+  "max_text_tokens": 300
+}

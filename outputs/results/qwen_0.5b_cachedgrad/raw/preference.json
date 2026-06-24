@@ -1,0 +1,10 @@
+{
+  "preference_accuracy": 0.602,
+  "weighted_preference_accuracy": 0.602,
+  "mean_margin": 0.6678983296453953,
+  "median_margin": 0.5589410066604614,
+  "mean_loss": 0.6718913494348526,
+  "num_examples": 500,
+  "evaluation_method": "uniform",
+  "training_method": "cached_grad"
+}

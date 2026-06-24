@@ -36,6 +36,10 @@ def main() -> None:
         surprisal_w_min=cfg.get("surprisal_w_min", 0.2),
         surprisal_w_max=cfg.get("surprisal_w_max", 3.0),
         use_amp=bundle.device.type == "cuda",
+        lambda_blend=cfg.get("lambda_blend", 0.7),
+        gaussian_sigma_scale=cfg.get("gaussian_sigma_scale", 4.0),
+        importance_update_freq=cfg.get("importance_update_freq", 10),
+        importance_ema_decay=cfg.get("importance_ema_decay", 0.9),
     )
     logger.info("Training method=%s -> %s", weight_method.value, train_cfg.output_dir)
     stats = train_dpo(bundle, train_ds, val_ds, train_cfg)

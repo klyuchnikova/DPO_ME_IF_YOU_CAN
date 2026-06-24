@@ -61,6 +61,10 @@ def _resolve_eval_weights(
                 "evaluation_method: uniform in the config."
             )
         return chosen_ext * chosen_mask, rejected_ext * rejected_mask
+    if method == WeightMethod.ONLINE_HYBRID:
+        raise ValueError(
+            "online_hybrid is training-only; set evaluation_method: uniform in config."
+        )
     raise ValueError(method)
 
 
@@ -69,12 +73,29 @@ def evaluate_preference(
     bundle: ModelBundle,
     dataset: PreferenceDataset,
     weight_method: WeightMethod = WeightMethod.UNIFORM,
+    eval_weight_method: WeightMethod | None = None,
     beta: float = 0.1,
     batch_size: int = 2,
     eval_weighted_accuracy: bool = True,
     surprisal_w_min: float = 0.2,
     surprisal_w_max: float = 3.0,
 ) -> EvalResult:
+    """Evaluate preference accuracy.
+
+    ``preference_accuracy`` is always unweighted (fair across methods).
+    ``eval_weight_method`` controls weighted accuracy and reported loss;
+    defaults to ``weight_method``. For CachedGrad checkpoints, use
+    ``evaluation_method: uniform`` in config unless test weights exist.
+    """
+    eval_wm = eval_weight_method or weight_method
+    has_cached_weights = dataset.cached_weights is not None
+    if eval_wm == WeightMethod.CACHED_GRAD and not has_cached_weights:
+        raise ValueError(
+            "eval_weight_method=cached_grad but dataset has no cached weights. "
+            "Precompute with scripts/03_precompute_cachedgrad.py or set evaluation_method: uniform."
+        )
+    if eval_wm == WeightMethod.ONLINE_HYBRID:
+        eval_wm = WeightMethod.UNIFORM
     bundle.policy.eval()
     device = bundle.device
     collate = lambda batch: preference_collate_fn(batch, bundle.tokenizer.pad_token_id)
@@ -116,7 +137,7 @@ def evaluate_preference(
 
         if eval_weighted_accuracy:
             cw, rw = _resolve_eval_weights(
-                weight_method,
+                eval_wm,
                 chosen_mask,
                 rejected_mask,
                 chosen_ref,
@@ -140,7 +161,7 @@ def evaluate_preference(
             rejected_ref,
             chosen_mask,
             rejected_mask,
-            weight_method,
+            eval_wm,
             beta,
             chosen_external_weights=ext_cw,
             rejected_external_weights=ext_rw,
@@ -176,6 +197,10 @@ def benchmark_step_time(
     num_steps: int = 20,
     surprisal_w_min: float = 0.2,
     surprisal_w_max: float = 3.0,
+    lambda_blend: float = 0.7,
+    gaussian_sigma_scale: float = 4.0,
+    importance_update_freq: int = 10,
+    importance_ema_decay: float = 0.9,
 ) -> dict[str, float]:
     """Measure forward+backward time per optimizer step on a few batches."""
     bundle.policy.train()
@@ -183,6 +208,18 @@ def benchmark_step_time(
     collate = lambda batch: preference_collate_fn(batch, bundle.tokenizer.pad_token_id)
     loader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate)
     optimizer = torch.optim.AdamW((p for p in bundle.policy.parameters() if p.requires_grad), lr=1e-5)
+
+    hybrid_computer = None
+    if weight_method == WeightMethod.ONLINE_HYBRID:
+        from src.ti_dpo_importance import OnlineHybridWeightComputer
+
+        hybrid_computer = OnlineHybridWeightComputer(
+            bundle.policy,
+            lambda_blend=lambda_blend,
+            sigma_scale=gaussian_sigma_scale,
+            update_freq=importance_update_freq,
+            ema_decay=importance_ema_decay,
+        )
 
     times: list[float] = []
     for i, batch in enumerate(loader):
@@ -199,7 +236,19 @@ def benchmark_step_time(
         rejected_mask = (rejected_labels[:, 1:] != -100).float()
         ext_cw = batch.get("chosen_weights")
         ext_rw = batch.get("rejected_weights")
-        if ext_cw is not None:
+        if weight_method == WeightMethod.ONLINE_HYBRID:
+            assert hybrid_computer is not None
+            ext_cw, ext_rw = hybrid_computer.maybe_recompute(
+                batch["ids"],
+                chosen_ids,
+                chosen_attn,
+                chosen_labels,
+                rejected_ids,
+                rejected_attn,
+                rejected_labels,
+                force=(i == 0),
+            )
+        elif ext_cw is not None:
             ext_cw = ext_cw.to(device)
             ext_rw = ext_rw.to(device)
 
@@ -227,6 +276,8 @@ def benchmark_step_time(
         loss.backward()
         optimizer.step()
         optimizer.zero_grad(set_to_none=True)
+        if hybrid_computer is not None:
+            hybrid_computer.on_optimizer_step()
         if device.type == "cuda":
             torch.cuda.synchronize()
         times.append(time.perf_counter() - t0)

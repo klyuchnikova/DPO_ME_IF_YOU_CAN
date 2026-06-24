@@ -26,6 +26,19 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--test-path", type=str, default=None)
 
 
+def resolve_split_cached_weights_path(cfg: dict, split: str) -> str | None:
+    """Resolve cached-gradient weights file for train/val/test."""
+    explicit = cfg.get(f"{split}_cached_weights_path")
+    if explicit:
+        return explicit
+    if split == "train" and cfg.get("cached_weights_path"):
+        return cfg["cached_weights_path"]
+
+    model_short = cfg["model_name"].split("/")[-1]
+    default = f"cache/{model_short}/{split}_cachedgrad_weights.pt"
+    return default if Path(default).exists() else None
+
+
 def load_bundle_and_data(args: argparse.Namespace, need_cached: bool = False):
     cfg = load_yaml(args.config)
     set_seed(cfg.get("seed", 42))
@@ -48,9 +61,15 @@ def load_bundle_and_data(args: argparse.Namespace, need_cached: bool = False):
     test_path = args.test_path or cfg.get("test_path")
 
     cached = None
-    cached_path = cfg.get("cached_weights_path")
-    if need_cached and cached_path:
-        cached = load_cached_grad_weights(cached_path)
+    if need_cached:
+        cached_path = resolve_split_cached_weights_path(cfg, "train")
+        if cached_path and Path(cached_path).exists():
+            cached = load_cached_grad_weights(cached_path)
+        elif cached_path:
+            raise FileNotFoundError(
+                f"CachedGrad training/runtime requires weights at {cached_path}. "
+                "Run scripts/03_precompute_cachedgrad.py --split train"
+            )
 
     train_examples = load_preference_jsonl(train_path)
     train_ds = PreferenceDataset(

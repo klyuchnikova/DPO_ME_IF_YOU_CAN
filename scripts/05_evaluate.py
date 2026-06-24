@@ -48,7 +48,7 @@ sys.path.insert(0, str(ROOT))
 import matplotlib.pyplot as plt
 import torch
 
-from scripts._common import add_common_args, load_bundle_and_data
+from scripts._common import add_common_args, load_bundle_and_data, resolve_split_cached_weights_path
 from src.attribution import compute_cached_grad_importance, load_cached_grad_weights
 from src.dataset import PreferenceDataset, load_preference_jsonl, tokenize_preference_pair
 from src.dpo import (
@@ -206,10 +206,14 @@ def run_preference_eval(
     cfg: Dict[str, Any],
     batch_size: int,
 ) -> Dict[str, Any]:
+    eval_method_name = cfg.get("evaluation_method", "uniform")
+    eval_weight_method = WeightMethod(eval_method_name)
+
     result = evaluate_preference(
         bundle,
         dataset,
         weight_method=weight_method,
+        eval_weight_method=eval_weight_method,
         beta=cfg["beta"],
         batch_size=max(1, batch_size),
         surprisal_w_min=cfg.get("surprisal_w_min", 0.2),
@@ -223,6 +227,8 @@ def run_preference_eval(
         "median_margin": result.median_margin,
         "mean_loss": result.mean_loss,
         "num_examples": result.num_examples,
+        "evaluation_method": eval_method_name,
+        "training_method": weight_method.value,
     }
 
 
@@ -237,10 +243,10 @@ def run_runtime_eval(
     cfg: Dict[str, Any],
     weight_method: WeightMethod,
 ) -> Dict[str, Any]:
-    """Use existing load_bundle_and_data helper to match train script setup."""
-    cfg2, bundle, train_ds, _, _, wm2, logger = load_bundle_and_data(args)
+    """Benchmark training-step time on train split (matches train script setup)."""
+    need_cached = weight_method == WeightMethod.CACHED_GRAD
+    cfg2, bundle, train_ds, _, _, wm2, logger = load_bundle_and_data(args, need_cached=need_cached)
 
-    # Prefer weight_method from config/common loader, but keep sanity field.
     result = benchmark_step_time(
         bundle,
         train_ds,
@@ -249,11 +255,17 @@ def run_runtime_eval(
         num_steps=args.num_runtime_steps,
         surprisal_w_min=cfg2.get("surprisal_w_min", 0.2),
         surprisal_w_max=cfg2.get("surprisal_w_max", 3.0),
+        lambda_blend=cfg2.get("lambda_blend", 0.7),
+        gaussian_sigma_scale=cfg2.get("gaussian_sigma_scale", 4.0),
+        importance_update_freq=cfg2.get("importance_update_freq", 10),
+        importance_ema_decay=cfg2.get("importance_ema_decay", 0.9),
     )
 
     result["weight_method"] = wm2.value
     result["model_name"] = cfg2["model_name"]
     result["num_runtime_steps"] = args.num_runtime_steps
+    if need_cached:
+        result["cached_weights_path"] = resolve_split_cached_weights_path(cfg2, "train")
 
     return result
 
@@ -355,6 +367,12 @@ def run_weight_visualizations(
     cached = None
     if args.cached_weights:
         cached = load_cached_grad_weights(args.cached_weights)
+    elif resolve_split_cached_weights_path(cfg, args.split):
+        split_cached = resolve_split_cached_weights_path(cfg, args.split)
+        if split_cached and Path(split_cached).exists():
+            cached = load_cached_grad_weights(split_cached)
+        else:
+            raise ValueError(f"No cached grad weights found at {split_cached}")
 
     rows_for_table: List[Dict[str, Any]] = []
 
@@ -645,11 +663,21 @@ def main() -> None:
     split_path = _get_split_path(args, cfg)
     examples = load_preference_jsonl(split_path)
 
+    cached_weights = None
+    cached_weights_path = args.cached_weights or resolve_split_cached_weights_path(cfg, args.split)
+    if cached_weights_path and Path(cached_weights_path).exists():
+        cached_weights = load_cached_grad_weights(cached_weights_path)
+        logger.info("Loaded cached grad weights from %s", cached_weights_path)
+    else:
+        logger.error("No cached grad weights found")
+        raise ValueError(f"No cached grad weights found at {cached_weights_path}")
+
     dataset = PreferenceDataset(
         examples,
         bundle.tokenizer,
         cfg["max_length"],
         cfg["max_prompt_length"],
+        cached_weights=cached_weights,
     )
 
     metadata = {
@@ -657,6 +685,8 @@ def main() -> None:
         "model_name": cfg["model_name"],
         "checkpoint": args.checkpoint or "base",
         "weight_method": weight_method.value,
+        "evaluation_method": cfg.get("evaluation_method", "uniform"),
+        "cached_weights_path": cached_weights_path,
         "split": args.split,
         "split_path": split_path,
         "num_split_examples": len(examples),

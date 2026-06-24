@@ -15,6 +15,7 @@ class WeightMethod(str, Enum):
     GAUSSIAN = "gaussian"
     SURPRISAL = "surprisal"
     CACHED_GRAD = "cached_grad"
+    ONLINE_HYBRID = "online_hybrid"  # TI-DPO hybrid grad+Gaussian, recomputed online
 
 
 def get_response_mask(labels: Tensor, label_pad_token_id: int) -> Tensor:
@@ -165,6 +166,11 @@ def compute_dpo_loss_from_logps(
     elif weight_method == WeightMethod.CACHED_GRAD:
         if chosen_external_weights is None or rejected_external_weights is None:
             raise ValueError("cached_grad requires precomputed chosen/rejected weights")
+        cw = chosen_external_weights * chosen_mask
+        rw = rejected_external_weights * rejected_mask
+    elif weight_method == WeightMethod.ONLINE_HYBRID:
+        if chosen_external_weights is None or rejected_external_weights is None:
+            raise ValueError("online_hybrid requires runtime-computed chosen/rejected weights")
         cw = chosen_external_weights * chosen_mask
         rw = rejected_external_weights * rejected_mask
     else:

@@ -15,6 +15,7 @@ from transformers import get_scheduler
 from src.dataset import PreferenceDataset, preference_collate_fn
 from src.dpo import WeightMethod, compute_dpo_loss_from_logps, get_per_token_logps
 from src.model import ModelBundle, save_lora_checkpoint
+from src.ti_dpo_importance import OnlineHybridWeightComputer
 from src.utils import ensure_dir, save_json
 
 
@@ -34,6 +35,11 @@ class TrainConfig:
     surprisal_w_min: float = 0.2
     surprisal_w_max: float = 3.0
     use_amp: bool = True
+    # online_hybrid (TI-DPO via ti_ppo scorers)
+    lambda_blend: float = 0.7
+    gaussian_sigma_scale: float = 4.0
+    importance_update_freq: int = 10
+    importance_ema_decay: float = 0.9
 
 
 @dataclass
@@ -88,6 +94,16 @@ def train_dpo(
     ensure_dir(config.output_dir)
     optimizer.zero_grad(set_to_none=True)
 
+    hybrid_computer: OnlineHybridWeightComputer | None = None
+    if config.weight_method == WeightMethod.ONLINE_HYBRID:
+        hybrid_computer = OnlineHybridWeightComputer(
+            bundle.policy,
+            lambda_blend=config.lambda_blend,
+            sigma_scale=config.gaussian_sigma_scale,
+            update_freq=config.importance_update_freq,
+            ema_decay=config.importance_ema_decay,
+        )
+
     for epoch in range(config.num_epochs):
         stats.epoch = epoch
         pbar = tqdm(train_loader, desc=f"epoch {epoch + 1}/{config.num_epochs}")
@@ -105,7 +121,19 @@ def train_dpo(
 
             ext_cw = batch.get("chosen_weights")
             ext_rw = batch.get("rejected_weights")
-            if ext_cw is not None:
+            if config.weight_method == WeightMethod.ONLINE_HYBRID:
+                assert hybrid_computer is not None
+                ext_cw, ext_rw = hybrid_computer.maybe_recompute(
+                    batch["ids"],
+                    chosen_ids,
+                    chosen_attn,
+                    chosen_labels,
+                    rejected_ids,
+                    rejected_attn,
+                    rejected_labels,
+                    force=(stats.global_step == 0 and step == 0),
+                )
+            elif ext_cw is not None:
                 ext_cw = ext_cw.to(device)
                 ext_rw = ext_rw.to(device)
 
@@ -153,6 +181,8 @@ def train_dpo(
                 scheduler.step()
                 optimizer.zero_grad(set_to_none=True)
                 stats.global_step += 1
+                if hybrid_computer is not None:
+                    hybrid_computer.on_optimizer_step()
 
                 if stats.global_step % config.logging_steps == 0:
                     pbar.set_postfix(
@@ -176,6 +206,7 @@ def train_dpo(
             "mean_loss": sum(stats.losses) / max(len(stats.losses), 1),
             "mean_step_sec": sum(stats.step_times) / max(len(stats.step_times), 1),
             "weight_method": config.weight_method.value,
+            "importance_update_freq": config.importance_update_freq,
         },
     )
     return stats

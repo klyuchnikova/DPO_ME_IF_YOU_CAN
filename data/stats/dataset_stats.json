@@ -1,0 +1,13 @@
+{
+  "num_samples": 3000,
+  "median_prompt_len": 82,
+  "p90_prompt_len": 205,
+  "median_chosen_len": 55,
+  "median_rejected_len": 53,
+  "p90_chosen_len": 126,
+  "p90_rejected_len": 127,
+  "chosen_longer_pct": 52.166666666666664,
+  "mean_length_ratio": 1.099375726423809,
+  "truncation_rate_pct": 0.0,
+  "duplicate_prompt_rate_pct": 0.0
+}

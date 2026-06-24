@@ -1,0 +1,27 @@
+model_name: Qwen/Qwen2.5-1.5B-Instruct
+train_path: data/processed/train.jsonl
+val_path: data/processed/val.jsonl
+test_path: data/processed/test.jsonl
+cached_weights_path: null
+
+max_length: 512
+max_prompt_length: 256
+beta: 0.1
+learning_rate: 5.0e-5
+batch_size: 1
+gradient_accumulation_steps: 16
+num_epochs: 1
+seed: 42
+precision: auto
+
+lora:
+  r: 8
+  alpha: 16
+  dropout: 0.05
+  target_modules: [q_proj, v_proj]
+
+surprisal_w_min: 0.2
+surprisal_w_max: 3.0
+
+output_dir: outputs/checkpoints/qwen_1.5b_dpo
+weight_method: uniform

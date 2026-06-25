@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -74,11 +75,26 @@ def main() -> None:
     )
 
     logger.info("Precomputing cached grad weights for %d examples (%s)", len(dataset), args.split)
+    t0 = time.perf_counter()
     weights = precompute_cached_grad_weights(ref_model, loader, device)
+    precompute_sec = time.perf_counter() - t0
     out = args.output or f"cache/{Path(model_name).name}/{args.split}_cachedgrad_weights.pt"
     ensure_dir(Path(out).parent)
     save_cached_grad_weights(weights, out)
-    logger.info("Saved %s", out)
+    stats_path = Path(out).with_suffix(".stats.json")
+    from src.utils import save_json
+
+    save_json(
+        stats_path,
+        {
+            "split": args.split,
+            "num_examples": len(dataset),
+            "precompute_sec": precompute_sec,
+            "sec_per_example": precompute_sec / max(len(dataset), 1),
+            "weights_path": str(out),
+        },
+    )
+    logger.info("Saved %s (%.1f sec, %.3f sec/example)", out, precompute_sec, precompute_sec / max(len(dataset), 1))
 
 
 if __name__ == "__main__":

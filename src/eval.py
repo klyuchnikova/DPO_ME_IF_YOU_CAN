@@ -189,6 +189,67 @@ def evaluate_preference(
     )
 
 
+@torch.no_grad()
+def evaluate_raw_preference(
+    bundle: ModelBundle,
+    dataset: PreferenceDataset,
+    batch_size: int = 2,
+) -> EvalResult:
+    """Base-model metric: compare sum of response log-probs (no ref normalization).
+
+    Matches the notebook check: correct iff log pi(chosen|x) > log pi(rejected|x).
+    Use this for the untrained base model; trained checkpoints should use
+    ``evaluate_preference`` (ref-normalized DPO score).
+    """
+    bundle.policy.eval()
+    device = bundle.device
+    collate = lambda batch: preference_collate_fn(batch, bundle.tokenizer.pad_token_id)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=collate)
+
+    correct = 0
+    margins: list[float] = []
+    total = 0
+
+    for batch in tqdm(loader, desc="eval-base"):
+        chosen_ids = batch["chosen_input_ids"].to(device)
+        chosen_attn = batch["chosen_attention_mask"].to(device)
+        chosen_labels = batch["chosen_labels"].to(device)
+        rejected_ids = batch["rejected_input_ids"].to(device)
+        rejected_attn = batch["rejected_attention_mask"].to(device)
+        rejected_labels = batch["rejected_labels"].to(device)
+
+        chosen_mask = (chosen_labels[:, 1:] != -100).float()
+        rejected_mask = (rejected_labels[:, 1:] != -100).float()
+
+        chosen_pi = get_per_token_logps(bundle.policy, chosen_ids, chosen_attn, chosen_labels)
+        rejected_pi = get_per_token_logps(bundle.policy, rejected_ids, rejected_attn, rejected_labels)
+
+        chosen_score = (chosen_pi * chosen_mask).sum(dim=-1)
+        rejected_score = (rejected_pi * rejected_mask).sum(dim=-1)
+        correct += (chosen_score > rejected_score).sum().item()
+
+        margin = (chosen_score - rejected_score).cpu().tolist()
+        margins.extend(margin)
+        total += chosen_ids.size(0)
+
+    sorted_margins = sorted(margins)
+    mid = len(sorted_margins) // 2
+    median_margin = (
+        sorted_margins[mid]
+        if len(sorted_margins) % 2 == 1
+        else (sorted_margins[mid - 1] + sorted_margins[mid]) / 2
+    )
+
+    return EvalResult(
+        preference_accuracy=correct / max(total, 1),
+        weighted_preference_accuracy=None,
+        mean_margin=sum(margins) / max(len(margins), 1),
+        median_margin=median_margin,
+        mean_loss=0.0,
+        num_examples=total,
+    )
+
+
 def benchmark_step_time(
     bundle: ModelBundle,
     dataset: PreferenceDataset,

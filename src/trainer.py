@@ -93,6 +93,8 @@ def train_dpo(
     stats = TrainStats()
     ensure_dir(config.output_dir)
     optimizer.zero_grad(set_to_none=True)
+    train_t0 = time.perf_counter()
+    num_micro_batches = 0
 
     hybrid_computer: OnlineHybridWeightComputer | None = None
     if config.weight_method == WeightMethod.ONLINE_HYBRID:
@@ -196,17 +198,23 @@ def train_dpo(
 
             stats.losses.append(metrics["loss"].item())
             stats.step_times.append(time.perf_counter() - t0)
+            num_micro_batches += 1
+
+    total_train_sec = time.perf_counter() - train_t0
+    mean_step_sec = sum(stats.step_times) / max(len(stats.step_times), 1)
+    train_stats_payload = {
+        "global_step": stats.global_step,
+        "num_micro_batches": num_micro_batches,
+        "mean_loss": sum(stats.losses) / max(len(stats.losses), 1),
+        "mean_step_sec": mean_step_sec,
+        "total_train_sec": total_train_sec,
+        "weight_method": config.weight_method.value,
+    }
+    if config.weight_method == WeightMethod.ONLINE_HYBRID:
+        train_stats_payload["importance_update_freq"] = config.importance_update_freq
 
     final_dir = Path(config.output_dir) / "final"
     save_lora_checkpoint(bundle, str(final_dir))
-    save_json(
-        Path(config.output_dir) / "train_stats.json",
-        {
-            "global_step": stats.global_step,
-            "mean_loss": sum(stats.losses) / max(len(stats.losses), 1),
-            "mean_step_sec": sum(stats.step_times) / max(len(stats.step_times), 1),
-            "weight_method": config.weight_method.value,
-            "importance_update_freq": config.importance_update_freq,
-        },
-    )
+    save_json(Path(config.output_dir) / "train_stats.json", train_stats_payload)
+    save_json(final_dir / "train_stats.json", train_stats_payload)
     return stats

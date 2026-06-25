@@ -1,0 +1,35 @@
+{
+  "model_name": "Qwen/Qwen2.5-0.5B-Instruct",
+  "train_path": "data/processed/train.jsonl",
+  "val_path": "data/processed/val.jsonl",
+  "test_path": "data/processed/test.jsonl",
+  "max_length": 512,
+  "max_prompt_length": 256,
+  "beta": 0.1,
+  "learning_rate": 5e-05,
+  "batch_size": 2,
+  "gradient_accumulation_steps": 8,
+  "num_epochs": 1,
+  "seed": 42,
+  "precision": "auto",
+  "lora": {
+    "r": 8,
+    "alpha": 16,
+    "dropout": 0.05,
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj"
+    ]
+  },
+  "surprisal_w_min": 0.2,
+  "surprisal_w_max": 3.0,
+  "lambda_blend": 0.7,
+  "gaussian_sigma_scale": 4.0,
+  "importance_update_freq": 10,
+  "importance_ema_decay": 0.9,
+  "output_dir": "outputs/checkpoints/qwen_0.5b_online_hybrid",
+  "weight_method": "online_hybrid",
+  "evaluation_method": "uniform"
+}

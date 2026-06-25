@@ -57,10 +57,12 @@ from src.dpo import (
     build_surprisal_weights,
     get_per_token_logps,
 )
-from src.eval import benchmark_step_time, evaluate_preference
-from src.model import load_policy_from_checkpoint, load_policy_model
+from src.eval import benchmark_step_time, evaluate_preference, evaluate_raw_preference
+from src.model import load_base_model_bundle, load_policy_from_checkpoint, load_policy_model
 from src.utils import (
     ensure_dir,
+    load_json,
+    load_train_stats,
     load_yaml,
     resolve_device,
     resolve_dtype,
@@ -173,10 +175,14 @@ def _get_split_path(args: argparse.Namespace, cfg: Dict[str, Any]) -> str:
 
 
 def _load_eval_bundle(args: argparse.Namespace, cfg: Dict[str, Any], device: str, dtype: torch.dtype):
-    """Load either base policy or LoRA checkpoint policy."""
+    """Load checkpoint policy, or frozen base model when no checkpoint is given."""
     if args.checkpoint:
         return load_policy_from_checkpoint(cfg["model_name"], args.checkpoint, device, dtype)
-    return load_policy_model(cfg["model_name"], device, dtype, lora_config=cfg.get("lora"))
+    return load_base_model_bundle(cfg["model_name"], device, dtype)
+
+
+def _is_base_eval(args: argparse.Namespace) -> bool:
+    return not args.checkpoint
 
 
 def _resolve_exp_name(args: argparse.Namespace, cfg: Dict[str, Any], weight_method: WeightMethod) -> str:
@@ -205,7 +211,26 @@ def run_preference_eval(
     weight_method: WeightMethod,
     cfg: Dict[str, Any],
     batch_size: int,
+    is_base_model: bool = False,
 ) -> Dict[str, Any]:
+    if is_base_model:
+        result = evaluate_raw_preference(
+            bundle,
+            dataset,
+            batch_size=max(1, batch_size),
+        )
+        return {
+            "preference_accuracy": result.preference_accuracy,
+            "weighted_preference_accuracy": None,
+            "mean_margin": result.mean_margin,
+            "median_margin": result.median_margin,
+            "mean_loss": result.mean_loss,
+            "num_examples": result.num_examples,
+            "evaluation_method": "raw_logprob",
+            "training_method": "base",
+            "metric_note": "sum of response log-probs; not ref-normalized",
+        }
+
     eval_method_name = cfg.get("evaluation_method", "uniform")
     eval_weight_method = WeightMethod(eval_method_name)
 
@@ -525,12 +550,26 @@ def run_weight_visualizations(
 # ---------------------------------------------------------------------
 
 
+def _load_precompute_stats(cfg: Dict[str, Any], split: str = "train") -> Optional[Dict[str, Any]]:
+    weights_path = resolve_split_cached_weights_path(cfg, split)
+    if not weights_path:
+        return None
+    stats_path = Path(weights_path).with_suffix(".stats.json")
+    if not stats_path.is_file():
+        return None
+    stats = load_json(stats_path)
+    stats["stats_path"] = str(stats_path)
+    return stats
+
+
 def write_combined_outputs(
     *,
     out_dir: Path,
     metadata: Dict[str, Any],
     preference_result: Optional[Dict[str, Any]],
     runtime_result: Optional[Dict[str, Any]],
+    training_result: Optional[Dict[str, Any]],
+    precompute_result: Optional[Dict[str, Any]],
     visualization_result: Optional[Dict[str, Any]],
 ) -> None:
     tables_dir = _ensure_dir(out_dir / "tables")
@@ -539,6 +578,8 @@ def write_combined_outputs(
         "metadata": metadata,
         "preference": preference_result,
         "runtime": runtime_result,
+        "training": training_result,
+        "precompute": precompute_result,
         "visualization": visualization_result,
     }
 
@@ -556,6 +597,16 @@ def write_combined_outputs(
         for k, v in runtime_result.items():
             if isinstance(v, (str, int, float, bool)) or v is None:
                 row[f"runtime.{k}"] = v
+
+    if training_result:
+        for k, v in training_result.items():
+            if isinstance(v, (str, int, float, bool)) or v is None:
+                row[f"training.{k}"] = v
+
+    if precompute_result:
+        for k, v in precompute_result.items():
+            if isinstance(v, (str, int, float, bool)) or v is None:
+                row[f"precompute.{k}"] = v
 
     if visualization_result:
         row.update(_flatten_for_table("visualization.", visualization_result))
@@ -578,6 +629,28 @@ def write_combined_outputs(
         ]
         _write_csv(tables_dir / "runtime_metrics.csv", runtime_rows)
         _write_markdown_table(tables_dir / "runtime_metrics.md", runtime_rows, title="Runtime Metrics")
+
+    if training_result or precompute_result:
+        timing_rows = []
+        if training_result:
+            timing_rows.extend(
+                {"metric": f"training.{k}", "value": v}
+                for k, v in training_result.items()
+                if isinstance(v, (str, int, float, bool)) or v is None
+            )
+        if precompute_result:
+            timing_rows.extend(
+                {"metric": f"precompute.{k}", "value": v}
+                for k, v in precompute_result.items()
+                if isinstance(v, (str, int, float, bool)) or v is None
+            )
+        if training_result and precompute_result and "total_train_sec" in training_result:
+            total = float(training_result["total_train_sec"]) + float(
+                precompute_result.get("precompute_sec", 0.0)
+            )
+            timing_rows.append({"metric": "total_wall_sec", "value": total})
+        _write_csv(tables_dir / "timing_metrics.csv", timing_rows)
+        _write_markdown_table(tables_dir / "timing_metrics.md", timing_rows, title="Training & Precompute Timing")
 
 
 # ---------------------------------------------------------------------
@@ -658,6 +731,7 @@ def main() -> None:
     )
 
     # Load model for preference eval and visualizations.
+    is_base = _is_base_eval(args)
     bundle = _load_eval_bundle(args, cfg, device, dtype)
 
     split_path = _get_split_path(args, cfg)
@@ -669,8 +743,7 @@ def main() -> None:
         cached_weights = load_cached_grad_weights(cached_weights_path)
         logger.info("Loaded cached grad weights from %s", cached_weights_path)
     else:
-        logger.error("No cached grad weights found")
-        raise ValueError(f"No cached grad weights found at {cached_weights_path}")
+        logger.info("No cached grad weights found")
 
     dataset = PreferenceDataset(
         examples,
@@ -684,6 +757,7 @@ def main() -> None:
         "exp_name": exp_name,
         "model_name": cfg["model_name"],
         "checkpoint": args.checkpoint or "base",
+        "is_base_model": is_base,
         "weight_method": weight_method.value,
         "evaluation_method": cfg.get("evaluation_method", "uniform"),
         "cached_weights_path": cached_weights_path,
@@ -700,23 +774,47 @@ def main() -> None:
 
     preference_result = None
     runtime_result = None
+    training_result = load_train_stats(args.checkpoint, cfg)
+    precompute_result = None
     visualization_result = None
+
+    if training_result:
+        logger.info(
+            "Training stats: total_sec=%.1f mean_step_sec=%.3f steps=%s",
+            float(training_result.get("total_train_sec", 0.0)),
+            float(training_result.get("mean_step_sec", 0.0)),
+            training_result.get("global_step"),
+        )
+        _write_json(out_dir / "raw" / "training.json", training_result)
+
+    if weight_method == WeightMethod.CACHED_GRAD:
+        precompute_result = _load_precompute_stats(cfg, "train")
+        if precompute_result:
+            logger.info(
+                "Precompute stats: %.1f sec (%.3f sec/example)",
+                float(precompute_result.get("precompute_sec", 0.0)),
+                float(precompute_result.get("sec_per_example", 0.0)),
+            )
+            _write_json(out_dir / "raw" / "precompute.json", precompute_result)
 
     # 1. Preference eval.
     if not args.skip_preference:
-        logger.info("Running preference evaluation...")
+        logger.info("Running preference evaluation (%s)...", "base raw logprob" if is_base else "dpo ref-normalized")
         preference_result = run_preference_eval(
             bundle=bundle,
             dataset=dataset,
             weight_method=weight_method,
             cfg=cfg,
             batch_size=max(1, cfg.get("batch_size", 1)),
+            is_base_model=is_base,
         )
         _write_json(out_dir / "raw" / "preference.json", preference_result)
         logger.info(
-            "Preference: acc=%.4f weighted_acc=%.4f mean_margin=%.4f",
+            "Preference: acc=%.4f weighted_acc=%s mean_margin=%.4f",
             preference_result["preference_accuracy"],
-            preference_result["weighted_preference_accuracy"],
+            f"{preference_result['weighted_preference_accuracy']:.4f}"
+            if preference_result.get("weighted_preference_accuracy") is not None
+            else "n/a",
             preference_result["mean_margin"],
         )
 
@@ -752,6 +850,8 @@ def main() -> None:
         metadata=metadata,
         preference_result=preference_result,
         runtime_result=runtime_result,
+        training_result=training_result,
+        precompute_result=precompute_result,
         visualization_result=visualization_result,
     )
 

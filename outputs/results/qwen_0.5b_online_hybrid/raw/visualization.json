@@ -1,0 +1,5 @@
+{
+  "num_visualized": 3,
+  "figure_dir": "outputs/results/qwen_0.5b_online_hybrid/figures",
+  "table_csv": "outputs/results/qwen_0.5b_online_hybrid/tables/weight_examples.csv"
+}

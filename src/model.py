@@ -41,6 +41,29 @@ def default_lora_config(
     )
 
 
+def load_base_model_bundle(
+    model_name: str,
+    device: torch.device,
+    dtype: torch.dtype,
+    trust_remote_code: bool = False,
+) -> ModelBundle:
+    """Frozen base instruct model (no LoRA) for pre-training preference accuracy."""
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=trust_remote_code)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "left"
+
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype=dtype,
+        trust_remote_code=trust_remote_code,
+    )
+    model.config.use_cache = False
+    model.eval()
+    model.to(device)
+    return ModelBundle(policy=model, tokenizer=tokenizer, device=device, dtype=dtype)
+
+
 def load_policy_model(
     model_name: str,
     device: torch.device,

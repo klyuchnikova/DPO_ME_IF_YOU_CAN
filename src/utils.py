@@ -103,3 +103,27 @@ def ensure_dir(path: str | Path) -> Path:
     path = Path(path)
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def resolve_train_stats_path(checkpoint: str | Path | None, cfg: dict[str, Any]) -> Path | None:
+    """Find train_stats.json next to checkpoint or under output_dir."""
+    candidates: list[Path] = []
+    if checkpoint:
+        p = Path(checkpoint)
+        candidates.extend([p / "train_stats.json", p.parent / "train_stats.json"])
+    if cfg.get("output_dir"):
+        candidates.append(Path(cfg["output_dir"]) / "train_stats.json")
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
+def load_train_stats(checkpoint: str | Path | None, cfg: dict[str, Any]) -> dict[str, Any] | None:
+    path = resolve_train_stats_path(checkpoint, cfg)
+    if path is None:
+        return None
+    stats = load_json(path)
+    stats["train_stats_path"] = str(path)
+    return stats
+

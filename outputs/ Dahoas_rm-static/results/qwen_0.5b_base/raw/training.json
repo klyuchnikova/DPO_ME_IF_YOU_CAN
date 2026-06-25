@@ -1,0 +1,7 @@
+{
+  "global_step": 187,
+  "mean_loss": 0.6692724336385727,
+  "mean_step_sec": 0.865992828357325,
+  "weight_method": "uniform",
+  "train_stats_path": "outputs/checkpoints/qwen_0.5b_dpo/train_stats.json"
+}

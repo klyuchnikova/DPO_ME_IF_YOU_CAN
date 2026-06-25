@@ -1,0 +1,7 @@
+{
+  "global_step": 187,
+  "mean_loss": 0.6749689337710539,
+  "mean_step_sec": 2.1489729655135115,
+  "weight_method": "online_hybrid",
+  "importance_update_freq": 10
+}

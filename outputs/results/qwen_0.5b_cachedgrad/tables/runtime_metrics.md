@@ -2,7 +2,7 @@
 
 | metric | value |
 | --- | --- |
-| mean_step_sec | 0.927415 |
+| mean_step_sec | 0.797776 |
 | num_steps | 20 |
 | weight_method | cached_grad |
 | model_name | Qwen/Qwen2.5-0.5B-Instruct |

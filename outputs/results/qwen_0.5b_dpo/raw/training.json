@@ -1,0 +1,9 @@
+{
+  "global_step": 187,
+  "num_micro_batches": 1500,
+  "mean_loss": 0.6609704738259315,
+  "mean_step_sec": 0.8646112524520431,
+  "total_train_sec": 1310.4217759299936,
+  "weight_method": "uniform",
+  "train_stats_path": "outputs/checkpoints/qwen_0.5b_dpo/final/train_stats.json"
+}

@@ -3,6 +3,7 @@
     "exp_name": "qwen_0.5b_cachedgrad",
     "model_name": "Qwen/Qwen2.5-0.5B-Instruct",
     "checkpoint": "outputs/checkpoints/qwen_0.5b_cachedgrad/final",
+    "is_base_model": false,
     "weight_method": "cached_grad",
     "evaluation_method": "uniform",
     "cached_weights_path": "cache/qwen_0.5b/test_cachedgrad_weights.pt",
@@ -14,17 +15,36 @@
     "beta": 0.1,
     "precision": "auto",
     "device": "cuda",
-    "timestamp_unix": 1782309382.954717
+    "timestamp_unix": 1782327092.2224498
   },
-  "preference": null,
+  "preference": {
+    "preference_accuracy": 0.626,
+    "weighted_preference_accuracy": 0.626,
+    "mean_margin": 0.6903393521904946,
+    "median_margin": 0.4342404007911682,
+    "mean_loss": 0.6675686455965042,
+    "num_examples": 500,
+    "evaluation_method": "uniform",
+    "training_method": "cached_grad"
+  },
   "runtime": {
-    "mean_step_sec": 0.9274146458992618,
+    "mean_step_sec": 0.797776025949861,
     "num_steps": 20,
     "weight_method": "cached_grad",
     "model_name": "Qwen/Qwen2.5-0.5B-Instruct",
     "num_runtime_steps": 20,
     "cached_weights_path": "cache/qwen_0.5b/train_cachedgrad_weights.pt"
   },
+  "training": {
+    "global_step": 187,
+    "num_micro_batches": 1500,
+    "mean_loss": 0.6905041093230248,
+    "mean_step_sec": 0.8442255729426009,
+    "total_train_sec": 1279.826572143007,
+    "weight_method": "cached_grad",
+    "train_stats_path": "outputs/checkpoints/qwen_0.5b_cachedgrad/final/train_stats.json"
+  },
+  "precompute": null,
   "visualization": {
     "num_visualized": 5,
     "figure_dir": "outputs/results/qwen_0.5b_cachedgrad/figures",

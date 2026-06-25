@@ -1,0 +1,10 @@
+metric,value
+preference_accuracy,0.456
+weighted_preference_accuracy,
+mean_margin,-4.890878406524658
+median_margin,-5.03090763092041
+mean_loss,0.0
+num_examples,500
+evaluation_method,raw_logprob
+training_method,base
+metric_note,sum of response log-probs; not ref-normalized

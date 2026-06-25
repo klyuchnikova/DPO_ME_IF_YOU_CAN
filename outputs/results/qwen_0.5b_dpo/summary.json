@@ -3,7 +3,10 @@
     "exp_name": "qwen_0.5b_dpo",
     "model_name": "Qwen/Qwen2.5-0.5B-Instruct",
     "checkpoint": "outputs/checkpoints/qwen_0.5b_dpo/final",
+    "is_base_model": false,
     "weight_method": "uniform",
+    "evaluation_method": "uniform",
+    "cached_weights_path": "cache/Qwen2.5-0.5B-Instruct/test_cachedgrad_weights.pt",
     "split": "test",
     "split_path": "data/processed/test.jsonl",
     "num_split_examples": 500,
@@ -12,26 +15,34 @@
     "beta": 0.1,
     "precision": "auto",
     "device": "cuda",
-    "timestamp_unix": 1782295195.936106
+    "timestamp_unix": 1782326879.583603
   },
   "preference": {
-    "preference_accuracy": 0.614,
-    "weighted_preference_accuracy": 0.614,
-    "mean_margin": 1.1818362221121788,
-    "median_margin": 0.9239124655723572,
-    "mean_loss": 0.6628191721439362,
-    "num_examples": 500
+    "preference_accuracy": 0.616,
+    "weighted_preference_accuracy": 0.616,
+    "mean_margin": 1.4708649703264236,
+    "median_margin": 1.1918994188308716,
+    "mean_loss": 0.6504347012042999,
+    "num_examples": 500,
+    "evaluation_method": "uniform",
+    "training_method": "uniform"
   },
   "runtime": {
-    "mean_step_sec": 0.8337630684996838,
+    "mean_step_sec": 0.7803278301478713,
     "num_steps": 20,
     "weight_method": "uniform",
     "model_name": "Qwen/Qwen2.5-0.5B-Instruct",
     "num_runtime_steps": 20
   },
-  "visualization": {
-    "num_visualized": 5,
-    "figure_dir": "outputs/results/qwen_0.5b_dpo/figures",
-    "table_csv": "outputs/results/qwen_0.5b_dpo/tables/weight_examples.csv"
-  }
+  "training": {
+    "global_step": 187,
+    "num_micro_batches": 1500,
+    "mean_loss": 0.6609704738259315,
+    "mean_step_sec": 0.8646112524520431,
+    "total_train_sec": 1310.4217759299936,
+    "weight_method": "uniform",
+    "train_stats_path": "outputs/checkpoints/qwen_0.5b_dpo/final/train_stats.json"
+  },
+  "precompute": null,
+  "visualization": null
 }

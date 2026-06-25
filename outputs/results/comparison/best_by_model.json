@@ -1,0 +1,11 @@
+{
+  "Qwen/Qwen2.5-0.5B-Instruct": {
+    "best_exp_name": "qwen_0.5b_surprisal",
+    "best_method": "surprisal",
+    "best_preference_accuracy": 0.63,
+    "best_delta_vs_base": 0.174,
+    "best_mean_margin": 0.9215327763557434,
+    "best_total_wall_sec": 1313.469974756008,
+    "best_runtime_mean_step_sec": 0.7909439587994711
+  }
+}

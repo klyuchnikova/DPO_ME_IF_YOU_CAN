@@ -1,0 +1,9 @@
+{
+  "global_step": 187,
+  "num_micro_batches": 1500,
+  "mean_loss": 0.6571255738139152,
+  "mean_step_sec": 0.8667923863586038,
+  "total_train_sec": 1313.469974756008,
+  "weight_method": "surprisal",
+  "train_stats_path": "outputs/checkpoints/qwen_0.5b_surprisal/final/train_stats.json"
+}

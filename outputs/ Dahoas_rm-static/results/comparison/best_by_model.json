@@ -1,0 +1,11 @@
+{
+  "Qwen/Qwen2.5-0.5B-Instruct": {
+    "best_exp_name": "qwen_0.5b_dpo",
+    "best_method": "dpo",
+    "best_preference_accuracy": 0.614,
+    "best_delta_vs_base": 0.15799999999999997,
+    "best_mean_margin": 1.1818362221121788,
+    "best_total_wall_sec": null,
+    "best_runtime_mean_step_sec": 0.8337630684996838
+  }
+}

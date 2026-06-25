@@ -1,0 +1,6 @@
+{
+  "global_step": 187,
+  "mean_loss": 0.6769455423156421,
+  "mean_step_sec": 0.8538949142379376,
+  "weight_method": "cached_grad"
+}

@@ -1,0 +1,7 @@
+metric,value
+preference_accuracy,0.614
+weighted_preference_accuracy,0.614
+mean_margin,1.1818362221121788
+median_margin,0.9239124655723572
+mean_loss,0.6628191721439362
+num_examples,500

@@ -1,0 +1,9 @@
+# Runtime Metrics
+
+| metric | value |
+| --- | --- |
+| mean_step_sec | 1.403630 |
+| num_steps | 20 |
+| weight_method | online_hybrid |
+| model_name | Qwen/Qwen2.5-0.5B-Instruct |
+| num_runtime_steps | 20 |

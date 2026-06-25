@@ -1,0 +1,41 @@
+{
+  "metadata": {
+    "exp_name": "qwen_0.5b_base",
+    "model_name": "Qwen/Qwen2.5-0.5B-Instruct",
+    "checkpoint": "base",
+    "is_base_model": true,
+    "weight_method": "uniform",
+    "evaluation_method": "uniform",
+    "cached_weights_path": null,
+    "split": "test",
+    "split_path": "data/processed/test.jsonl",
+    "num_split_examples": 500,
+    "max_length": 512,
+    "max_prompt_length": 256,
+    "beta": 0.1,
+    "precision": "auto",
+    "device": "cuda",
+    "timestamp_unix": 1782318852.2909915
+  },
+  "preference": {
+    "preference_accuracy": 0.456,
+    "weighted_preference_accuracy": null,
+    "mean_margin": -4.890878406524658,
+    "median_margin": -5.03090763092041,
+    "mean_loss": 0.0,
+    "num_examples": 500,
+    "evaluation_method": "raw_logprob",
+    "training_method": "base",
+    "metric_note": "sum of response log-probs; not ref-normalized"
+  },
+  "runtime": null,
+  "training": {
+    "global_step": 187,
+    "mean_loss": 0.6692724336385727,
+    "mean_step_sec": 0.865992828357325,
+    "weight_method": "uniform",
+    "train_stats_path": "outputs/checkpoints/qwen_0.5b_dpo/train_stats.json"
+  },
+  "precompute": null,
+  "visualization": null
+}

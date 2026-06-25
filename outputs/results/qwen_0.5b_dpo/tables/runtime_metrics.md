@@ -2,7 +2,7 @@
 
 | metric | value |
 | --- | --- |
-| mean_step_sec | 0.833763 |
+| mean_step_sec | 0.780328 |
 | num_steps | 20 |
 | weight_method | uniform |
 | model_name | Qwen/Qwen2.5-0.5B-Instruct |

@@ -10,10 +10,10 @@
   "results_root": "outputs/results",
   "num_runtime_steps": 20,
   "skip_runtime": false,
-  "skip_preference": true,
+  "skip_preference": false,
   "skip_visualize": false,
   "num_visualize": 5,
-  "cached_weights": "cache/qwen_0.5b/test_cachedgrad_weights.pt",
+  "cached_weights": null,
   "max_plot_tokens": 160,
   "max_text_tokens": 300
 }

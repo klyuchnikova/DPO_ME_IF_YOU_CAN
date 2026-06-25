@@ -2,7 +2,7 @@
 
 | metric | value |
 | --- | --- |
-| mean_step_sec | 0.801326 |
+| mean_step_sec | 0.790944 |
 | num_steps | 20 |
 | weight_method | surprisal |
 | model_name | Qwen/Qwen2.5-0.5B-Instruct |

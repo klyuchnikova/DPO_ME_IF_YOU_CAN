@@ -1,8 +1,10 @@
 {
-  "preference_accuracy": 0.598,
-  "weighted_preference_accuracy": 0.6,
-  "mean_margin": 0.6115684385150671,
-  "median_margin": 0.4879835247993469,
-  "mean_loss": 0.6625209926962853,
-  "num_examples": 500
+  "preference_accuracy": 0.63,
+  "weighted_preference_accuracy": 0.63,
+  "mean_margin": 0.9215327763557434,
+  "median_margin": 0.7194831669330597,
+  "mean_loss": 0.6579588145017624,
+  "num_examples": 500,
+  "evaluation_method": "uniform",
+  "training_method": "surprisal"
 }

@@ -1,5 +1,0 @@
-{
-  "num_visualized": 5,
-  "figure_dir": "outputs/results/qwen_0.5b_surprisal/figures",
-  "table_csv": "outputs/results/qwen_0.5b_surprisal/tables/weight_examples.csv"
-}

@@ -1,0 +1,5 @@
+# Experiment Summary
+
+| exp_name | model_name | checkpoint | weight_method | split | split_path | num_split_examples | max_length | max_prompt_length | beta | precision | device | timestamp_unix | preference.preference_accuracy | preference.weighted_preference_accuracy | preference.mean_margin | preference.median_margin | preference.mean_loss | preference.num_examples | runtime.mean_step_sec | runtime.num_steps | runtime.weight_method | runtime.model_name | runtime.num_runtime_steps | visualization.num_visualized | visualization.figure_dir | visualization.table_csv |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| qwen_0.5b_dpo | Qwen/Qwen2.5-0.5B-Instruct | outputs/checkpoints/qwen_0.5b_dpo/final | uniform | test | data/processed/test.jsonl | 500 | 512 | 256 | 0.100000 | auto | cuda | 1782295195.936106 | 0.614000 | 0.614000 | 1.181836 | 0.923912 | 0.662819 | 500 | 0.833763 | 20 | uniform | Qwen/Qwen2.5-0.5B-Instruct | 20 | 5 | outputs/results/qwen_0.5b_dpo/figures | outputs/results/qwen_0.5b_dpo/tables/weight_examples.csv |

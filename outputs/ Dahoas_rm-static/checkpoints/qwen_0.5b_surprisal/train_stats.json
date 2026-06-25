@@ -1,0 +1,6 @@
+{
+  "global_step": 187,
+  "mean_loss": 0.6693839937448501,
+  "mean_step_sec": 0.8590299684525914,
+  "weight_method": "surprisal"
+}

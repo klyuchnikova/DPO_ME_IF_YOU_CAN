@@ -1,0 +1,41 @@
+{
+  "metadata": {
+    "exp_name": "qwen_0.5b_online_hybrid",
+    "model_name": "Qwen/Qwen2.5-0.5B-Instruct",
+    "checkpoint": "outputs/checkpoints/qwen_0.5b_online_hybrid/final",
+    "weight_method": "online_hybrid",
+    "evaluation_method": "uniform",
+    "cached_weights_path": null,
+    "split": "test",
+    "split_path": "data/processed/test.jsonl",
+    "num_split_examples": 500,
+    "max_length": 512,
+    "max_prompt_length": 256,
+    "beta": 0.1,
+    "precision": "auto",
+    "device": "cuda",
+    "timestamp_unix": 1782317110.9587893
+  },
+  "preference": {
+    "preference_accuracy": 0.602,
+    "weighted_preference_accuracy": 0.602,
+    "mean_margin": 0.5874895714521408,
+    "median_margin": 0.5281074643135071,
+    "mean_loss": 0.6708711508512497,
+    "num_examples": 500,
+    "evaluation_method": "uniform",
+    "training_method": "online_hybrid"
+  },
+  "runtime": {
+    "mean_step_sec": 1.403629823349911,
+    "num_steps": 20,
+    "weight_method": "online_hybrid",
+    "model_name": "Qwen/Qwen2.5-0.5B-Instruct",
+    "num_runtime_steps": 20
+  },
+  "visualization": {
+    "num_visualized": 3,
+    "figure_dir": "outputs/results/qwen_0.5b_online_hybrid/figures",
+    "table_csv": "outputs/results/qwen_0.5b_online_hybrid/tables/weight_examples.csv"
+  }
+}

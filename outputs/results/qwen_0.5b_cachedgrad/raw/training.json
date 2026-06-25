@@ -1,0 +1,9 @@
+{
+  "global_step": 187,
+  "num_micro_batches": 1500,
+  "mean_loss": 0.6905041093230248,
+  "mean_step_sec": 0.8442255729426009,
+  "total_train_sec": 1279.826572143007,
+  "weight_method": "cached_grad",
+  "train_stats_path": "outputs/checkpoints/qwen_0.5b_cachedgrad/final/train_stats.json"
+}

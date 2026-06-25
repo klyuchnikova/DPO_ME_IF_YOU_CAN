@@ -1,7 +1,9 @@
 metric,value
-preference_accuracy,0.614
-weighted_preference_accuracy,0.614
-mean_margin,1.1818362221121788
-median_margin,0.9239124655723572
-mean_loss,0.6628191721439362
+preference_accuracy,0.616
+weighted_preference_accuracy,0.616
+mean_margin,1.4708649703264236
+median_margin,1.1918994188308716
+mean_loss,0.6504347012042999
 num_examples,500
+evaluation_method,uniform
+training_method,uniform

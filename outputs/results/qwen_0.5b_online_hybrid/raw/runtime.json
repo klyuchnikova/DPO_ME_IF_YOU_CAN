@@ -1,5 +1,5 @@
 {
-  "mean_step_sec": 1.403629823349911,
+  "mean_step_sec": 0.8940713909527404,
   "num_steps": 20,
   "weight_method": "online_hybrid",
   "model_name": "Qwen/Qwen2.5-0.5B-Instruct",

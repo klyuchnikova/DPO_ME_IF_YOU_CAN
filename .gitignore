@@ -221,6 +221,6 @@ __marimo__/
 data/processed/
 data/raw/
 cache/
-outputs/
+outputs/checkpoints/
 *.pt
 *.npy

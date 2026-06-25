@@ -51,15 +51,163 @@ We **do not** reproduce TI-DPO's triplet loss or full PPO pipeline.
 
 ---
 
-## 2. Place in the literature
+## 2. Literature and related work
 
-<!-- TODO: Add related work for the presentation/report.
-Suggested entries:
-- Rafailov et al., DPO (2023)
-- TI-DPO paper (token-importance guided DPO) — cite when available
-- LoRA / PEFT for efficient fine-tuning
-- Reward-model / RLHF baselines (contrast only)
--->
+### 2.1 Reinforcement from human feedback and DPO
+
+Reinforcement Learning from Human Feedback (RLHF) turned alignment into an optimization problem: collect human comparisons over model outputs, train a reward model rϕ to predict those comparisons, then optimize a generation policy πθ to maximize the learned reward under a KL constraint to a reference policy πref (PPO-based and later variants). A simplifying alternative, Direct Preference Optimization (DPO) [Rafailov et al., 2023], shows that under the Bradley–Terry preference model the reward signal can be expressed as a log-ratio of policy to reference probabilities, and that a closed-form objective equivalent to an implicit reward can be used instead of an explicit reward model + RL loop.
+
+DPO objective (sequence-level):
+\[
+\Delta_{\text{DPO}}(x,y_w,y_l)=\log\frac{\pi_\theta(y_w\mid x)}{\pi_{\text{ref}}(y_w\mid x)}-\log\frac{\pi_\theta(y_l\mid x)}{\pi_{\text{ref}}(y_l\mid x)}
+\]
+\[
+L_{\text{DPO}}=-\log\sigma(\beta\Delta_{\text{DPO}})
+\]
+This objective avoids an explicit reward model and is easy to implement using two forward passes (policy and reference) and a simple sigmoid loss. DPO thus became a practical RLHF alternative for fine-tuning LLMs with preference pairs.
+
+### 2.2 Token-level concerns and TI‑DPO
+
+A limitation of DPO and sequence-level RLHF is granularity: they treat each token equally, though human preferences often hinge on a few decisive tokens (safety instructions, factual claims). Token-level variants of DPO and RLHF have been proposed: they decompose sequence reward into per-token contributions and reweight tokens to focus learning [TDPO, TIS-DPO, others]. The TI‑DPO paper (the main paper motivating this project) proposes two key ideas to achieve robust token-level alignment:
+
+1. hybrid token importance: combine gradient-based attribution \(I_{\text{grad}}\) (how much each token embedding influences a target scalar) with a Gaussian positional prior \(P_{\text{gaussian}}\) to correct “lost-in-the-middle” biases; and
+2. a triplet-style auxiliary loss to provide structured guidance for intermediate generations.
+
+TI‑DPO weight formula:
+\[
+W = \lambda I_{\text{grad}} + (1-\lambda)P_{\text{gaussian}}
+\]
+
+They show theoretically that weighting non-critical tokens down reduces variance and yields a tighter loss bound versus vanilla DPO; empirically TI‑DPO reports gains on a range of tasks. However, computing gradient attribution online for every sequence can double training cost (extra backward pass per example), which is problematic on limited hardware.
+
+### 2.3 Gradient attribution and positional priors
+
+Gradient attribution methods (e.g., input-gradient norms, integrated gradients) estimate how much each input feature contributes to a scalar target. In text, a common technique is computing \(I_t = \lVert \nabla_{e_t} L_{\text{target}}\rVert_1\) where \(e_t\) is the token embedding and \(L_{\text{target}}\) is a chosen scalar (e.g., final logit or NLL). These are attractive because they directly tie tokens to the model's objective, but they require extra backward work.
+
+Empirical findings also show position biases in LLMs (e.g., “lost-in-the-middle”): attention/importance sometimes peaks at edges and underweights middle tokens (see Liu et al., Lost-in-the-Middle). A Gaussian prior centered on the response can partially correct arbitrary architectural biases and stabilize importance estimation.
+
+### 2.4 Cheap proxies: surprisal and cached importance
+
+Two practical ideas arise:
+
+- Surprisal as proxy: token surprisal under the reference model, i.e. \(-\log\pi_{\text{ref}}(y_t)\), is a cheap content-dependent signal that requires no extra backward passes because ref logprobs are already computed for DPO. Intuitively, surprising tokens may be information-rich and preference-relevant.
+- Cached gradient attribution: compute gradient-based token importance once (or infrequently) offline and reuse it during training to avoid repeated backward costs. The tradeoff is staleness: importance computed on a frozen reference may become less accurate as the policy drifts with LoRA updates.
+
+### 2.5 Efficient fine-tuning (LoRA / PEFT) and practical constraints
+
+To run experiments on limited hardware we use parameter-efficient fine-tuning (PEFT / LoRA) to adapt the model by adding small low-rank updates. This keeps memory and compute requirements low and isolates adaptation to a small subset of parameters (q,k,v,o projections typically).
+
+### 2.6 Summary of the gap
+
+TI‑DPO provides a strong conceptual framework for token-level alignment but is computationally heavier due to online attribution and auxiliary triplet losses. Our project focuses on the practical question: can cheap or cached approximations (surprisal, cached gradients, sparse top‑k) recover most of the gains of token-level weighting while staying practical on a single V100?
+
+---
+
+## 3. Methods (detailed)
+
+This chapter defines the loss, the weight variants, normalization, and the exact training/eval pipelines used in experiments.
+
+### 3.1 Notation and base DPO formula
+
+- prompt \(x\)
+- preferred (chosen) response \(y_w\)
+- less-preferred (rejected) response \(y_l\)
+- policy \(\pi_\theta\) (trainable — LoRA adapters enabled)
+- reference \(\pi_{\text{ref}}\) (base weights, LoRA disabled)
+
+Per-token log-probabilities for a sequence \(y\) under model \(m\) are \(\log \pi_m(y_t\mid x,y_{<t})\). Define the per-token advantage:
+\[
+\mathrm{adv}_t(x,y) := \log\pi_\theta(y_t\mid x,y_{<t}) - \log\pi_{\text{ref}}(y_t\mid x,y_{<t})
+\]
+
+Weighted-token DPO difference:
+\[
+\Delta_{\text{weighted}}(x,y_w,y_l) = \sum_{t\in y_w} w^w_t \cdot \mathrm{adv}_t(x,y_w) - \sum_{t\in y_l} w^l_t \cdot \mathrm{adv}_t(x,y_l)
+\]
+Loss:
+\[
+L = -\log\sigma(\beta\Delta_{\text{weighted}})
+\]
+For uniform DPO, \(w_t\equiv 1\).
+
+Normalization: after building raw weights \(\tilde w_t\) for the response tokens we re-normalize so the mean weight across active response tokens equals 1:
+\[
+w_t = \frac{\tilde w_t}{\frac{1}{T}\sum_{i=1}^T \tilde w_i}\quad\text{(only over response tokens)}
+\]
+This preserves the loss scale and keeps \(\beta\) consistent between methods.
+
+Mask/shift note: in causal LM implementations the logits are shifted; weights and masks must align with the labels used for loss (labels shifted by 1). Implementation ensures tokens and weights correspond to the same positions.
+
+---
+
+### 3.2 Methods compared (formulas + implementation notes)
+
+We compare five methods: Uniform (vanilla DPO), Surprisal, CachedGrad, Online Hybrid (TI‑DPO-style adaptation), and Gaussian (control).
+
+#### A. Uniform DPO (baseline)
+- \(w_t = 1\).
+- Implementation: standard DPO; policy forward + ref forward → per-token advs → sum.
+
+#### B. Surprisal-DPO
+- Raw weight:
+  \[
+  \tilde w_t = -\log\pi_{\text{ref}}(y_t\mid x,y_{<t})
+  \]
+- Clamp and normalize:
+  \[
+  w_t = \mathrm{clamp}\bigg(\frac{\tilde w_t}{\frac{1}{T}\sum_i\tilde w_i},\; w_{\min}, w_{\max}\bigg)
+  \]
+  with \(w_{\min}=0.2,\ w_{\max}=3.0\) (these are practical hyperparameters).
+- Implementation: no extra backward; uses ref logprobs already computed for DPO.
+
+#### C. CachedGrad-DPO
+- Precompute (offline) per-example importance for chosen and rejected responses using a frozen reference:
+  1. Target scalar: response negative log-likelihood under ref
+     \[
+     L_{\mathrm{NLL}}(x,y) = -\sum_{t} \log\pi_{\text{ref}}(y_t\mid x,y_{<t})
+     \]
+  2. Gradient attribution: for each token embedding \(e_t\),
+     \[
+     I_t := \|\nabla_{e_t} L_{\mathrm{NLL}}\|_1
+     \]
+  3. Normalize to mean 1 → store `chosen_weights` and `rejected_weights`.
+- Training: load cached weights aligned to examples and apply them directly at each step (no extra backward during training).
+- Tradeoffs: large one-time precompute; training step time ≈ DPO; potential staleness.
+
+#### D. Online Hybrid (approx TI‑DPO)
+- Weight blend:
+  \[
+  \tilde w_t = \lambda \cdot I_{\text{grad},t}^{\text{current}} + (1-\lambda)\cdot P_{\text{gauss},t}
+  \]
+  with \(\lambda\approx 0.7\).
+- \(I_{\text{grad},t}^{\text{current}}=\|\nabla_{e_t}L_{\mathrm{NLL}}\|_1\) computed on the current policy (LoRA on).
+- \(P_{\text{gauss},t} = \exp\big(-\tfrac{(t-\mu)^2}{2\sigma^2}\big)\) with \(\mu=(T-1)/2,\ \sigma=T/4\).
+- Implementation: recompute \(I_{\text{grad}}\) every \(K\) optimizer steps (we used \(K=10\)), smooth by EMA to avoid instability. This is the most expensive option but closest to the paper’s idea.
+- Tradeoffs: extra backward passes (≈ +30–50% wall time); can track importance changes as policy updates.
+
+#### E. Gaussian-only (ablation)
+- \(w_t \propto P_{\text{gauss},t}\).
+- Implementation: negligible cost; useful ablation to check positional prior value.
+
+---
+
+### 3.5 Evaluation details
+
+- Main metric: held-out preference accuracy (uniform ref-normalized DPO score evaluated on test pairs). For fair comparison we evaluate all trained checkpoints with the same (uniform) scoring unless reporting the diagnostic `weighted_preference_accuracy`.
+- Report mean margin \( \mathbb{E}[R(y_w)-R(y_l)] \) as a confidence measure (not directly comparable when evaluation metrics differ).
+- Provide approximate 95% CI for accuracy: \(\text{CI} \approx 1.96\sqrt{p(1-p)/n}\) (used to judge whether small gaps are significant).
+- Runtime: training step time (mean over 20 measured steps) and one-time precompute cost for CachedGrad.
+
+---
+
+### 3.6 Hyperparameters and practical config
+
+- LoRA: r=8, alpha=16, dropout=0.05, target modules q,k,v,o (or q,v if memory tight).
+- β (DPO temperature): 0.1 (keeps sigmoid gradient scale stable across methods).
+- Surprisal clamp: [0.2, 3.0]; normalization to mean 1.
+- CachedGrad precompute: process whole train split; save per-example weights; include metadata mapping to JSONL order.
+- Online hybrid: recompute every 10 optimizer steps; EMA decay 0.9; λ=0.7; clamp final weights to [0.2, 5.0] to avoid spikes.
+- Training: ~3k training pairs, 1 epoch, batch 2, gradient accumulation to reach effective batch if needed; total steps ≈187 in our runs.
 
 ---
 

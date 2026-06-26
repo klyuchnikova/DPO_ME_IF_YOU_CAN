@@ -10,42 +10,35 @@ We study whether cheap token-importance approximations can match the *spirit* of
 
 Standard DPO optimizes a sequence-level preference objective: every response token contributes equally to
 
-\[
-\Delta_{\text{DPO}} =
-\log \frac{\pi_\theta(y_w|x)}{\pi_{\text{ref}}(y_w|x)}
--
-\log \frac{\pi_\theta(y_l|x)}{\pi_{\text{ref}}(y_l|x)}
-\quad,\quad
-L_{\text{DPO}} = -\log \sigma(\beta \Delta_{\text{DPO}})
-\]
+$$
+\Delta_{\mathrm{DPO}} = \log \frac{\pi_\theta(y_w \mid x)}{\pi_{\mathrm{ref}}(y_w \mid x)} - \log \frac{\pi_\theta(y_l \mid x)}{\pi_{\mathrm{ref}}(y_l \mid x)} \quad,\quad L_{\mathrm{DPO}} = -\log \sigma(\beta \Delta_{\mathrm{DPO}})
+$$
 
-TI-DPO argues that some tokens matter more for human preference (e.g. safety phrases, key facts) than filler text. It replaces the sum with token weights \(w_t\):
+TI-DPO argues that some tokens matter more for human preference (e.g. safety phrases, key facts) than filler text. It replaces the sum with token weights $w_t$:
 
-\[
-\Delta_{\text{weighted}} =
-\sum_t w^w_t \left[\log \pi_\theta(y^w_t|\cdot) - \log \pi_{\text{ref}}(y^w_t|\cdot)\right]
--
-\sum_t w^l_t \left[\log \pi_\theta(y^l_t|\cdot) - \log \pi_{\text{ref}}(y^l_t|\cdot)\right]
-\]
+$$
+\Delta_{\mathrm{weighted}} = \sum_t w^{w}_{t} \left[\log \pi_\theta(y^{w}_{t} \mid \cdot) - \log \pi_{\mathrm{ref}}(y^{w}_{t} \mid \cdot)\right] - \sum_t w^{l}_{t} \left[\log \pi_\theta(y^{l}_{t} \mid \cdot) - \log \pi_{\mathrm{ref}}(y^{l}_{t} \mid \cdot)\right]
+$$
 
-In the paper, \(w_t\) combines gradient attribution and a Gaussian positional prior:
+In the paper, $w_t$ combines gradient attribution and a Gaussian positional prior:
 
-\[
-W = \lambda I_{\text{grad}} + (1-\lambda) P_{\text{gaussian}}
-\]
+$$
+W = \lambda I_{\mathrm{grad}} + (1-\lambda) P_{\mathrm{gaussian}}
+$$
 
-Computing \(I_{\text{grad}}\) online (backward through input embeddings every step) is expensive on a single GPU.
+Computing $I_{\text{grad}}$ online (backward through input embeddings every step) is expensive on a single GPU.
 
 Our goal:
 
 Make token-importance DPO cheaper for small LLMs by replacing online gradient attribution with cached or approximate token-importance weights — while keeping LoRA DPO training practical on one V100.
+
 
 We do not reproduce TI-DPO's triplet loss or full PPO pipeline.
 
 Research questions:
 
 1. Can token-weighted DPO improve over vanilla DPO on small LLMs?
-2. Can surprisal (\(-\log \pi_{\text{ref}}\)) work as a almost-free proxy?
+2. Can surprisal ($-\log \pi_{\text{ref}}$) work as a almost-free proxy?
 3. Can cached gradients match online attribution at near-DPO train speed?
 4. Does the answer depend on the dataset (general helpfulness vs safety-style preferences)?
 
